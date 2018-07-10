@@ -1,25 +1,152 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template.Rmd"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
+##Loading and preprocessing data
+First we should load the data to R studio 
+```{r}
+dat = read.csv('activity.csv', header = T)
+head(dat)
+```
 
 
+Next, we should remove NA values by subseting our data and keep only the rows where each of the column has no NA values.
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r}
+clean <- subset(dat, (!is.na(dat$steps)) & (!is.na(dat$date)) & (!is.na(dat$interval)))
+head(clean)
+```
+##What is mean total number of steps taken per day?
+For making our histogram, first we should summarize the steps by day
+```{r}
+
+library(dplyr)
+spd <- clean %>% group_by(date) %>% summarise( tsteps = sum(steps))
+head(spd)
+
+```
+
+Then we are ready to make our first histogram and add the appropriate lines for mean and median
+
+```{r}
+hist(spd$tsteps, main = "Steps per day")
+
+mean_spd <- round(mean(spd$tsteps), 1)
+median_spd <- round(median(spd$tsteps), 1)
+
+abline(v=mean_spd, lwd = 1, col = 'red')
+abline(v=median_spd, lwd = 1, col = 'blue')
+
+legend('topright', lty = 1, lwd = 2, col = c("red", "blue"), legend = c('Mean', 'Median'))
+
+paste0("Mean Value is ",mean_spd," and Median Value is ", median_spd)
+
+
+```
+## What is average daily activity 
+Our next goal is to plot the average daily activity pattern. Our first task is to aggregate the suitable measure as we did before
+```{r}
+aspd <- clean %>% group_by(interval) %>% summarise( tsteps = mean(steps))
+head(aspd)
+```
+
+Then we can proceed in plotting our graph
+```{r}
+with(aspd, plot(interval, tsteps, type = 'l', main = 'Avg Steps by date', ylab = 'Average Steps'))
+```
+Lastly we can find the interval with the maximum number of steps as shown below
+```{r}
+maxstepsint <- aspd[which.max(aspd$tsteps), 1]
+maxsteps <- aspd[which.max(aspd$tsteps), 2]
+paste0('Max number of steps is contained in the following interval ', maxstepsint, ' with average number of steps ', round(maxsteps))
+```
+##Inputing Missing Values
+First we have to report the number of missing values
+```{r}
+sum(is.na(dat$steps))
+```
+Now we have to replace the missing values
+```{r}
+fixeddat <- dat
+replace = function(x, y){
+    if(is.na(x))
+    {
+        return (y)  #replace
+    }
+    else return (x)  #no replace
+}
+
+fixeddat$steps = mapply(replace,fixeddat$steps, mean(fixeddat$steps, na.rm = TRUE))
+```
+Now we can create two histograms for comparing the differences
+```{r}
+org <- dat %>% group_by(date) %>% summarise( tsteps = sum(steps))
+fixed <- fixeddat %>% group_by(date) %>% summarise( tsteps = sum(steps))
+
+# orginal #
+
+hist(org$tsteps, main = "Steps per day (Original Data)", xlab = "Total Steps per day")
+
+mean_org <- round(mean(org$tsteps, na.rm = TRUE), 1)
+median_org <- round(median(org$tsteps, na.rm = TRUE), 1)
+
+abline(v=mean_org, lwd = 1, col = 'red')
+abline(v=median_org, lwd = 1, col = 'blue')
+
+legend('topright', lty = 1, lwd = 2, col = c("red", "blue"), legend = c('Mean', 'Median'))
+
+paste0("Mean Value is ",mean_org," and Median Value is ", median_org)
+
+#fixed #
+
+hist(fixed$tsteps, main = "Steps per day (Fixed using Average)", xlab = "Total Steps per day")
+
+mean_fixed <- round(mean(fixed$tsteps), 1)
+median_fixed <- round(median(fixed$tsteps), 1)
+
+abline(v=mean_fixed, lwd = 1, col = 'red')
+abline(v=median_fixed, lwd = 1, col = 'blue')
+
+legend('topright', lty = 1, lwd = 2, col = c("red", "blue"), legend = c('Mean', 'Median'))
+
+paste0("Mean Value is ",mean_fixed," and Median Value is ", median_fixed)
+```
+We can see that the differences are minor. In fact the mean value is almost the same in both cases. Median value is increased by a little in the case of the fixed Values
+
+##Are there differences in activity patterns between weekdays and weekends?
+First we should distinguish the weekends from the res of the days
+```{r}
+weekday = function(x){
+    if(x %in% c('Saturday', 'Sunday')) return('Weekend')
+    else return('Weekday')
+}
+ 
+clean$day = weekdays(as.Date(clean$date))
+clean$dcat = as.factor(apply(as.matrix(clean$day), 1, weekday))
+
+stepsbydaytype <- clean %>% group_by(interval, dcat) %>% summarise( tsteps = mean(steps))
+
+```
+Finally we can plot the 2 charts in order to compare the activity patterns for these 2 categories. 
+(For creating them we will use lattice package and we will try to replicate the plot shown in the example)
+
+```{r}
+library(lattice)
+xyplot(tsteps ~ interval | dcat, data = stepsbydaytype,
+      type = 'l',
+      xlab = 'Interval',
+      ylab = 'Number of Steps',
+      layout = c(1,2))
+```
+
+For creating the images we used the following code for each case
+```{r}
+png('plot1.png', width=480, height=480)
+dev.off()
+```
+
